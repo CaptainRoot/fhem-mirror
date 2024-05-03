@@ -1441,6 +1441,7 @@ sub Set {
                    SolCast-API
                    ForecastSolar-API
                    VictronKI-API
+                   LocalKI-API
                  );
 
   push @fcdevs, devspec2array ("TYPE=DWD_OpenData");
@@ -2450,6 +2451,7 @@ sub _getRoofTopData {
       __getSolCastData ($paref);
       return;
   }
+LocalKIAPI
   elsif ($hash->{MODEL} eq 'ForecastSolarAPI') {
       __getForecastSolarData ($paref);
       return;
@@ -2460,6 +2462,10 @@ sub _getRoofTopData {
   }
   elsif ($hash->{MODEL} eq 'VictronKiAPI') {
       my $ret = __getVictronSolarData ($paref);
+      return $ret;
+  }
+  elsif ($hash->{MODEL} eq 'LocalKIAPI') {
+      my $ret = __getLocalKISolarData ($paref);
       return $ret;
   }
   elsif ($hash->{MODEL} =~ /^OpenMeteo/xs) {
@@ -4264,6 +4270,52 @@ sub ___setOpenMeteoAPIcallKeyData {
   }
 
   debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef));
+
+return;
+}
+
+################################################################
+#   Abruf DWD Strahlungsdaten und Rohdaten ohne Korrektur
+#   speichern in solcastapi Hash
+################################################################
+sub __getLocalKISolarData {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $date  = $paref->{date};                                                                  # aktueller Tag "YYYY-MM-DD"
+  my $t     = $paref->{t}     // time;
+  my $lang  = $paref->{lang};
+
+  my $type  = $hash->{TYPE};
+
+  my $stime   = $date.' 00:00:00';                                                             # Startzeit Soll Übernahmedaten
+  my $sts     = timestringToTimestamp ($stime);
+  my @strings = sort keys %{$data{$type}{$name}{strings}};
+
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
+
+  debugLog ($paref, "apiCall", "Local KI - collect data with start >$stime< =>");
+
+  for my $num (0..47) {
+      my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # laufendes Datum ' ' Zeit
+      my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # laufende Stunde in 24h format (00-23), DWD liefert Rad1h zum Ende der Stunde - Modul benutzt die Startzeit
+      my ($fd,$fh) = calcDayHourMove (0, $num);
+
+      next if($fh == 24);
+
+      $runh = sprintf("%02d", $runh);
+
+      my $pv = ReadingsVal ("PV_KI_Prognose", "fc_${fd}_${runh}", 0);
+
+      debugLog ($paref, "apiCall", "Local KI - got data -> starttime: $dateTime, reading: fc_${fd}_${runh}, yield: $pv");
+
+      for my $string (@strings) {
+          $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;
+      }
+  }
+
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
 
 return;
 }
@@ -9195,6 +9247,21 @@ sub __calcEnergyPieces {
   }
 
 return;
+}
+
+################################################################
+#     Berechnen Forecast Tag / Stunden Verschieber
+#     aus aktueller Stunde + lfd. Nummer
+################################################################
+sub _calcDayHourMove {
+  my $chour = shift;
+  my $num   = shift;
+
+  my $fh = $chour + $num;
+  my $fd = int ($fh / 24) ;
+  $fh    = $fh - ($fd * 24);
+
+return ($fd,$fh);
 }
 
 ####################################################################################
@@ -16500,6 +16567,9 @@ sub setModel {
   }
   elsif ($api =~ /OpenMeteoWorld-/xs) {
       $hash->{MODEL} = 'OpenMeteoWorldAPI';
+  }
+    elsif ($api =~ /LocalKI-/xs) {
+      $hash->{MODEL} = 'LocalKIAPI';
   }
   else {
       $hash->{MODEL} = 'DWD';
