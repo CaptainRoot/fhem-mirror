@@ -1260,12 +1260,12 @@ sub _readCacheFile {
               delete $data{$type}{$name}{aidectree}{aitrained};
               $data{$type}{$name}{aidectree}{aitrained}  = $dtree;
               $data{$type}{$name}{current}{aitrainstate} = 'ok';
-              
+
               Log3 ($name, 3, qq{$name - cached data "$title" restored});
               return;
           }
       }
-      
+
       delete $data{$type}{$name}{circular}{99}{aitrainLastFinishTs};
       delete $data{$type}{$name}{circular}{99}{runTimeTrainAI};
       return;
@@ -1371,6 +1371,7 @@ sub Set {
                    SolCast-API
                    ForecastSolar-API
                    VictronKI-API
+                   LocalKI-API
                  );
 
   push @fcdevs, devspec2array ("TYPE=DWD_OpenData");
@@ -1583,9 +1584,9 @@ sub _setcurrentRadiationAPI {              ## no critic "not used"
   }
 
   my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
-  
+
   if (($awdev1 eq 'OpenMeteoDWD-API'         && $prop ne 'OpenMeteoDWD-API')         ||
-      ($awdev1 eq 'OpenMeteoDWDEnsemble-API' && $prop ne 'OpenMeteoDWDEnsemble-API') ||  
+      ($awdev1 eq 'OpenMeteoDWDEnsemble-API' && $prop ne 'OpenMeteoDWDEnsemble-API') ||
       ($awdev1 eq 'OpenMeteoWorld-API'       && $prop ne 'OpenMeteoWorld-API')) {
       return "The attribute 'ctrlWeatherDev1' is set to '$awdev1'. \n".
              "Change that attribute to another weather device first if you want use an other API.";
@@ -2726,6 +2727,10 @@ sub _getRoofTopData {
   }
   elsif ($hash->{MODEL} eq 'VictronKiAPI') {
       my $ret = __getVictronSolarData ($paref);
+      return $ret;
+  }
+  elsif ($hash->{MODEL} eq 'LocalKIAPI') {
+      my $ret = __getLocalKISolarData ($paref);
       return $ret;
   }
   elsif ($hash->{MODEL} =~ /^OpenMeteo/xs) {
@@ -4070,15 +4075,15 @@ sub __getopenMeteoData {
   my $t     = $paref->{t};
   my $lang  = $paref->{lang};
   my $debug = $paref->{debug};
-  
+
   my $donearq = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
-  
+
   if ($donearq >= $ometmaxreq) {
       my $msg = "The limit of maximum $ometmaxreq daily API requests is reached or already exceeded. Process is exited.";
       Log3 ($name, 1, "$name - ERROR - $msg");
       return $msg;
   }
-  
+
   if (!$force) {                                                                                      # regulärer API Abruf
       my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
 
@@ -4089,17 +4094,17 @@ sub __getopenMeteoData {
   }
 
   debugLog ($paref, 'apiCall', qq{Open-Meteo API Call - the daily API requests -> limited to: $ometmaxreq, done: $donearq});
-  
+
   my $submodel         = InternalVal ($hash->{NAME}, 'MODEL', '');
   $paref->{allstrings} = ReadingsVal ($name, 'inverterStrings', '');
-  $paref->{submodel}   = $submodel eq 'OpenMeteoDWDAPI'         ? 'DWD ICON Seamless'          : 
-                         $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 'DWD ICON Seamless Ensemble' : 
-                         $submodel eq 'OpenMeteoWorldAPI'       ? 'World Best Match'           :  
+  $paref->{submodel}   = $submodel eq 'OpenMeteoDWDAPI'         ? 'DWD ICON Seamless'          :
+                         $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 'DWD ICON Seamless Ensemble' :
+                         $submodel eq 'OpenMeteoWorldAPI'       ? 'World Best Match'           :
                          'unknown';
-                         
-  return "The Weather Model '$submodel' is not a valid Open-Meteo Weather Model" if($paref->{submodel} eq 'unknown'); 
-  
-  $paref->{callequivalent} = $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 20 : 1;               
+
+  return "The Weather Model '$submodel' is not a valid Open-Meteo Weather Model" if($paref->{submodel} eq 'unknown');
+
+  $paref->{callequivalent} = $submodel eq 'OpenMeteoDWDEnsembleAPI' ? 20 : 1;
   $paref->{begin}          = 1;
 
   __openMeteoDWD_ApiRequest ($paref);
@@ -4169,9 +4174,9 @@ sub __openMeteoDWD_ApiRequest {
   $url   .= "&latitude=".$lat;
   $url   .= "&longitude=".$lon;
   $url   .= "&hourly=temperature_2m,rain,weather_code,cloud_cover,is_day,global_tilted_irradiance";
-  $url   .= "&current=temperature_2m,weather_code,cloud_cover" if($submodel !~ /Ensemble/xs);  
-  $url   .= "&minutely_15=global_tilted_irradiance"            if($submodel !~ /Ensemble/xs);        
-  $url   .= "&daily=sunrise,sunset"                            if($submodel !~ /Ensemble/xs);  
+  $url   .= "&current=temperature_2m,weather_code,cloud_cover" if($submodel !~ /Ensemble/xs);
+  $url   .= "&minutely_15=global_tilted_irradiance"            if($submodel !~ /Ensemble/xs);
+  $url   .= "&daily=sunrise,sunset"                            if($submodel !~ /Ensemble/xs);
   $url   .= "&forecast_hours=48";
   $url   .= "&forecast_days=2";
   $url   .= "&tilt=".$tilt;
@@ -4322,7 +4327,7 @@ sub __openMeteoDWD_ApiResponse {
       ## Akt. Werte
       #################
       my ($curwid, $curwcc, $curtmp, $curstr);
-      
+
       if (defined $jdata->{current}{time}) {
           ($err, $curstr) = timestringUTCtoLocal ($name, $jdata->{current}{time}, '%Y-%m-%dT%H:%M');
 
@@ -4434,7 +4439,7 @@ sub __openMeteoDWD_ApiResponse {
           if ($k == 0) {
               $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{today} = $sunrise;
               $data{$type}{$name}{solcastapi}{'?All'}{sunset}{today}  = $sunset;
-              
+
               if ($debug =~ /apiProcess/xs) {
                   Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - Sunrise Today: $sunrise");
                   Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - SunSet Today: $sunset");
@@ -4444,7 +4449,7 @@ sub __openMeteoDWD_ApiResponse {
           if ($k == 1) {
               $data{$type}{$name}{solcastapi}{'?All'}{sunrise}{tomorrow} = $sunrise;
               $data{$type}{$name}{solcastapi}{'?All'}{sunset}{tomorrow}  = $sunset;
-              
+
               if ($debug =~ /apiProcess/xs) {
                   Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - Sunrise Tomorrow: $sunrise");
                   Log3 ($name, 1, "$name DEBUG> Open-Meteo DWD ICON API - SunSet Tomorrow: $sunset");
@@ -4515,6 +4520,52 @@ sub ___setOpenMeteoAPIcallKeyData {
   }
 
   debugLog ($paref, "apiProcess|apiCall", "Open-Meteo API Call - remaining API Requests: $drr, Request equivalents p. call: $cequ, new call interval: ".SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $ometeorepdef));
+
+return;
+}
+
+################################################################
+#   Abruf DWD Strahlungsdaten und Rohdaten ohne Korrektur
+#   speichern in solcastapi Hash
+################################################################
+sub __getLocalKISolarData {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $date  = $paref->{date};                                                                  # aktueller Tag "YYYY-MM-DD"
+  my $t     = $paref->{t}     // time;
+  my $lang  = $paref->{lang};
+
+  my $type  = $hash->{TYPE};
+
+  my $stime   = $date.' 00:00:00';                                                             # Startzeit Soll Übernahmedaten
+  my $sts     = timestringToTimestamp ($stime);
+  my @strings = sort keys %{$data{$type}{$name}{strings}};
+
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;
+
+  debugLog ($paref, "apiCall", "Local KI - collect data with start >$stime< =>");
+
+  for my $num (0..47) {
+      my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # laufendes Datum ' ' Zeit
+      my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # laufende Stunde in 24h format (00-23), DWD liefert Rad1h zum Ende der Stunde - Modul benutzt die Startzeit
+      my ($fd,$fh) = calcDayHourMove (0, $num);
+
+      next if($fh == 24);
+
+      $runh = sprintf("%02d", $runh);
+
+      my $pv = ReadingsVal ("PV_KI_Prognose", "fc_${fd}_${runh}", 0);
+
+      debugLog ($paref, "apiCall", "Local KI - got data -> starttime: $dateTime, reading: fc_${fd}_${runh}, yield: $pv");
+
+      for my $string (@strings) {
+          $data{$type}{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;
+      }
+  }
+
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
 
 return;
 }
@@ -5057,7 +5108,7 @@ sub __getaiRuleStrings {                 ## no critic "not used"
   my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
   $atf    = '<b>'.$hqtxt{ailatr}{$lang}.' </b>'.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
   my $art = $hqtxt{aitris}{$lang}.' '.CircularVal ($hash, 99, 'runTimeTrainAI', '-');
-  
+
   if (@rsl) {
       my $l = scalar @rsl;
       $rs   = "<b>Number of Rules: $l / Number of Nodes: $nodes / Depth: $depth</b>\n";
@@ -5632,14 +5683,14 @@ return;
 }
 
 ################################################################
-#     currentRadiationAPI verzögert aus Attr setzen      
+#     currentRadiationAPI verzögert aus Attr setzen
 ################################################################
-sub __setRadAPIdelayed {                    
+sub __setRadAPIdelayed {
   my $hash = shift;
-  
+
   my $name   = $hash->{NAME};
   my $awdev1 = AttrVal ($name, 'ctrlWeatherDev1', '');
-  
+
   CommandSet (undef, "$name currentRadiationAPI $awdev1");                         # automatisch currentRadiationAPI setzen
 
 return;
@@ -6216,7 +6267,7 @@ sub _addDynAttr {
           push @deva, ($adwds ? "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API,$adwds" : "ctrlWeatherDev1:OpenMeteoDWD-API,OpenMeteoDWDEnsemble-API,OpenMeteoWorld-API");
           next;
       }
-      
+
       push @deva, ($adwds ? "ctrlWeatherDev".$step.":$adwds" : "");
   }
 
@@ -8769,6 +8820,21 @@ sub __calcEnergyPieces {
   }
 
 return;
+}
+
+################################################################
+#     Berechnen Forecast Tag / Stunden Verschieber
+#     aus aktueller Stunde + lfd. Nummer
+################################################################
+sub _calcDayHourMove {
+  my $chour = shift;
+  my $num   = shift;
+
+  my $fh = $chour + $num;
+  my $fd = int ($fh / 24) ;
+  $fh    = $fh - ($fd * 24);
+
+return ($fd,$fh);
 }
 
 ####################################################################################
@@ -11839,7 +11905,7 @@ sub __createAIicon {
               $aicanuse ne 'ok' ? $htitles{ainuse}{$lang} :
               q{};
   $aitit   =~ s/<NAME>/$name/xs;
-  
+
   my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
   $atf    = $hqtxt{ailatr}{$lang}.' '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
 
@@ -13660,7 +13726,7 @@ sub finishTrain {
   $data{$type}{$name}{current}{aiinitstate}              = $aiinitstate     if(defined $aiinitstate);
   $data{$type}{$name}{circular}{99}{runTimeTrainAI}      = $runTimeTrainAI  if(defined $runTimeTrainAI);  # !! in Circular speichern um zu persistieren, setTimeTracking speichert zunächst in Current !!
   $data{$type}{$name}{circular}{99}{aitrainLastFinishTs} = $aitrainFinishTs if(defined $aitrainFinishTs);
-  
+
   if ($aitrainstate eq 'ok') {
       _readCacheFile ({ hash      => $hash,
                         name      => $name,
@@ -13673,7 +13739,7 @@ sub finishTrain {
   }
 
   $paref->{debug} = getDebug ($hash);
-  
+
   if (defined $hash->{HELPER}{AIBLOCKRUNNING}) {
       debugLog ($paref, 'aiProcess', qq{AI Training BlockingCall PID "$hash->{HELPER}{AIBLOCKRUNNING}{pid}" finished, state: $aitrainstate});
       delete($hash->{HELPER}{AIBLOCKRUNNING});
@@ -13788,11 +13854,11 @@ sub aiTrain {                            ## no critic "not used"
   if (!isPrepared4AI ($hash)) {
       $err    = CurrentVal ($hash, 'aicanuse', '');
       $serial = encode_base64 (Serialize ( { name         => $name,
-                                             aitrainstate => "Train: not performed -> $err",      
+                                             aitrainstate => "Train: not performed -> $err",
                                              aicanuse     => $err
-                                           } 
+                                           }
                                          ), "");
-      
+
       $block ? return ($serial) : return \&finishTrain ($serial);
   }
 
@@ -13801,11 +13867,11 @@ sub aiTrain {                            ## no critic "not used"
 
   if (!$dtree) {
       $err    = 'no AI::DecisionTree object present';
-      $serial = encode_base64 (Serialize ( {name         => $name, 
+      $serial = encode_base64 (Serialize ( {name         => $name,
                                             aitrainstate => "Train: not performed -> $err",
                                             aiinitstate  => "Init: $err",
                                             aicanuse     => 'ok'
-                                           } 
+                                           }
                                          ), "");
       $block ? return ($serial) : return \&finishTrain ($serial);
   }
@@ -13815,12 +13881,12 @@ sub aiTrain {                            ## no critic "not used"
        }
        or do { Log3 ($name, 1, "$name - aiTrain ERROR: $@");
                $err    = (split / at/, $@)[0];
-               $serial = encode_base64 (Serialize ( {name         => $name, 
+               $serial = encode_base64 (Serialize ( {name         => $name,
                                                      aitrainstate => "Train: $err",
                                                      aicanuse     => 'ok'
-                                                    } 
+                                                    }
                                                   ), "");
-               
+
                $block ? return ($serial) : return \&finishTrain ($serial);
              };
 
@@ -14077,7 +14143,7 @@ sub aiAddRawData {
 
           my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
           next if(!$rad1h || $rad1h <= 0);
-          
+
           ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
           #######################################################################################################################
           next if($rad1h =~ /\.[0-9]{1}$/xs);                 # 29.03.2024 -> einen Monat drin lassen wegen pvHistory turn
@@ -15887,7 +15953,10 @@ sub setModel {
   }
   elsif ($api =~ /OpenMeteoWorld-/xs) {
       $hash->{MODEL} = 'OpenMeteoWorldAPI';
-  }  
+  }
+    elsif ($api =~ /LocalKI-/xs) {
+      $hash->{MODEL} = 'LocalKIAPI';
+  }
   else {
       $hash->{MODEL} = 'DWD';
   }
@@ -17985,35 +18054,35 @@ to ensure that the system configuration is correct.
       This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
       15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
       The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
-      models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a 
+      models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a
       seamless forecast.
       The comprehensive and clearly laid out
       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
       the service's website.
       <br><br>
-      
+
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      This Open-Meteo API variant provides access to the DWD's global 
+      This Open-Meteo API variant provides access to the DWD's global
       <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
       <br>
       The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
-      a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
-      They do this by running several simulations or models with slight differences in the starting conditions or settings. 
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are
+      a special type of forecasting method that takes into account the uncertainties in weather forecasting.
+      They do this by running several simulations or models with slight differences in the starting conditions or settings.
       Each simulation, known as an ensemble member, represents a possible outcome of the weather.
-      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used. 
+      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used.
       <br><br>
 
       <b>OpenMeteoWorld-API</b> <br>
-      
+
       As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
-      The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
+      The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric
       Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
       The providers' models are combined for each location worldwide to produce the best possible forecast.
       The services and weather models are used automatically based on the location coordinates contained in the API call.
       <br><br>
-      
+
       <b>SolCast-API</b> <br>
 
       API usage requires one or more API-keys (accounts) and one or more Rooftop-ID's in advance
@@ -19370,9 +19439,9 @@ to ensure that the system configuration is correct.
 
        Specifies the device or API for providing the required weather data (cloud cover, precipitation, etc.).<br>
        The attribute 'ctrlWeatherDev1' specifies the leading weather service and is mandatory.<br>
-       If an Open-Meteo API is selected in the 'ctrlWeatherDev1' attribute, this Open-Meteo service is automatically set as the 
+       If an Open-Meteo API is selected in the 'ctrlWeatherDev1' attribute, this Open-Meteo service is automatically set as the
        source of the radiation data (Setter currentRadiationAPI). <br><br>
-       
+
        <b>OpenMeteoDWD-API</b> <br>
 
        Open-Meteo is an open source weather API and offers free access for non-commercial purposes.
@@ -19382,37 +19451,37 @@ to ensure that the system configuration is correct.
        This API provides access to the renowned ICON weather models of the German Weather Service (DWD), which provide
        15-minute data for short-term forecasts in Central Europe and global forecasts with a resolution of 11 km.
        The ICON model is a preferred choice for general weather forecast APIs when no other high-resolution weather
-       models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a 
+       models are available. The models DWD Icon D2, DWD Icon EU and DWD Icon Global models are merged into a
        seamless forecast.
        The comprehensive and clearly laid out
        <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Documentation</a> is available on
        the service's website.
        <br><br>
-       
+
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
-      This Open-Meteo API variant provides access to the DWD's global 
+      This Open-Meteo API variant provides access to the DWD's global
       <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble Prediction System (EPS)</a>.
       <br>
       The ensemble models ICON-D2-EPS, ICON-EU-EPS and ICON-EPS are seamlessly combined. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are 
-      a special type of forecasting method that takes into account the uncertainties in weather forecasting. 
-      They do this by running several simulations or models with slight differences in the starting conditions or settings. 
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble weather forecasts</a> are
+      a special type of forecasting method that takes into account the uncertainties in weather forecasting.
+      They do this by running several simulations or models with slight differences in the starting conditions or settings.
       Each simulation, known as an ensemble member, represents a possible outcome of the weather.
-      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used. 
+      In this implementation, 40 ensemble members per weather feature are combined and the most probable result is used.
       <br><br>
 
        <b>OpenMeteoWorld-API</b> <br>
-      
+
        As a variant of the Open Meteo service, the OpenMeteoWorld API provides the optimum forecast for a specific location worldwide.
-       The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric 
+       The OpenMeteoWorld API seamlessly combines weather models from well-known organizations such as NOAA (National Oceanic and Atmospheric
        Administration), DWD (German Weather Service), CMCC (Canadian) and ECMWF (European Centre for Medium-Range Weather Forecasts).
        The providers' models are combined for each location worldwide to produce the best possible forecast.
        The services and weather models are used automatically based on the location coordinates contained in the API call.
-       <br><br>      
-       
+       <br><br>
+
        <b>DWD Device</b> <br>
-       
+
        As an alternative to Open-Meteo, an FHEM 'DWD_OpenData' device can be used to supply the weather data.<br>
        If no device of this type exists, at least one DWD_OpenData device must first be defined.
        (see <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
@@ -20214,35 +20283,35 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
       15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
       von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
-      anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU 
+      anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU
       und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
       Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
       <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
       <br><br>
-      
+
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
       Diese Open-Meteo API Variante bietet Zugang zum globalen
       <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
       des DWD. <br>
       Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
-      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
-      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen 
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind
+      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt.
+      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen
       oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
       In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
-      Ergbnis verwendet.      
+      Ergbnis verwendet.
       <br><br>
-      
+
       <b>OpenMeteoWorld-API</b> <br>
-      
+
       Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
-      Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
+      Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric
       Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
       Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
       Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
-      <br><br>   
-      
+      <br><br>
+
       <b>SolCast-API</b> <br>
 
       Die API-Nutzung benötigt vorab ein oder mehrere API-keys (Accounts) sowie ein oder mehrere Rooftop-ID's
@@ -21622,37 +21691,37 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        Diese API bietet Zugang zu den renommierten ICON-Wettermodellen des Deutschen Wetterdienstes (DWD), die
        15-minütige Daten für kurzfristige Vorhersagen in Mitteleuropa und globale Vorhersagen mit einer Auflösung
        von 11 km liefern. Das ICON-Modell ist eine bevorzugte Wahl für allgemeine Wettervorhersage-APIs, wenn keine
-       anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU 
+       anderen hochauflösenden Wettermodelle verfügbar sind. Es werden die Modelle DWD Icon D2, DWD Icon EU
        und DWD Icon Global zu einer nahtlosen Vorhersage zusammengeführt.
        Auf der Webseite des Dienstes ist die umfangreiche und übersichtliche
        <a href='https://open-meteo.com/en/docs/dwd-api' target='_blank'>API Dokumentation</a> verfügbar.
        <br><br>
-       
+
       <b>OpenMeteoDWDEnsemble-API</b> <br>
 
       Diese Open-Meteo API Variante bietet Zugang zum globalen
       <a href='https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/04_ensemble_methoden/ensemble_vorhersage/ensemble_vorhersagen.html' target='_blank'>Ensemble-Vorhersagesystem (EPS)</a>
       des DWD. <br>
       Es werden die Ensemble Modelle ICON-D2-EPS, ICON-EU-EPS und ICON-EPS nahtlos vereint. <br>
-      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind 
-      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt. 
-      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen 
+      <a href='https://openmeteo.substack.com/p/ensemble-weather-forecast-api' target='_blank'>Ensemble-Wetterprognosen</a> sind
+      eine spezielle Art von Vorhersagemethode, die die Unsicherheiten bei der Wettervorhersage berücksichtigt.
+      Sie tun dies, indem sie mehrere Simulationen oder Modelle mit leichten Unterschieden in den Startbedingungen
       oder Einstellungen ausführen. Jede Simulation, bekannt als Ensemblemitglied, stellt ein mögliches Ergebnis des Wetters dar.
       In der vorliegenden Implementierung werden 40 Ensemblemitglieder pro Wettermerkmal zusammengeführt und das wahrscheinlichste
-      Ergbnis verwendet.      
+      Ergbnis verwendet.
       <br><br>
-      
+
        <b>OpenMeteoWorld-API</b> <br>
-      
+
        Als Variante des Open-Meteo Dienstes liefert die OpenMeteoWorld-API die optimale Vorhersage für einen bestimmten Ort weltweit.
-       Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric 
+       Die OpenMeteoWorld-API vereint nahtlos Wettermodelle bekannter Organisationen wie NOAA (National Oceanic and Atmospheric
        Administration), DWD (Deutscher Wetterdienst), CMCC (Canadian) und ECMWF (Europäisches Zentrum für mittelfristige Wettervorhersage).
        Für jeden Ort weltweit werden die Modelle der Anbieter kombiniert, um die bestmögliche Vorhersage zu erstellen.
        Die Nutzung der Dienste und Wettermodelle erfolgt automatisch anhand der im API Aufruf enthaltenen Standortkoordinaten.
        <br><br>
-       
+
        <b>DWD Gerät</b> <br>
-       
+
        Alternativ zu Open-Meteo kann ein FHEM 'DWD_OpenData'-Gerät zur Lieferung der Wetterdaten dienen.<br>
        Ist noch kein Gerät dieses Typs vorhanden, muß zunächst mindestens ein DWD_OpenData Gerät
        definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
