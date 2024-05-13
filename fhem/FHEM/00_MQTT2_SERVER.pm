@@ -82,18 +82,22 @@ MQTT2_SERVER_Define($$)
 
   MQTT2_SERVER_resetClients($hash);
   MQTT2_SERVER_Undef($hash, undef) if($hash->{OLDDEF}); # modify
-  my $ret = TcpServer_Open($hash, $port, $global);
 
-  # Make sure that fhem only runs once
-  if($ret && !$init_done) {
-    Log3 $hash, 1, "$ret. Exiting.";
-    exit(1);
-  }
   readingsSingleUpdate($hash, "nrclients", 0, 0);
   $hash->{clients} = {};
   $hash->{retain} = {};
   InternalTimer(1, "MQTT2_SERVER_keepaliveChecker", $hash, 0);
-  return $ret;
+
+  if($init_done) {
+    return TcpServer_Open($hash, $port, $global);
+
+  } else {
+    InternalTimer(1, sub(){ #138451
+      my $ret = TcpServer_Open($hash, $port, $global);
+      Log 1, $ret if($ret);
+    }, $hash, 0);
+    return undef;
+  }
 }
 
 sub
@@ -400,6 +404,8 @@ MQTT2_SERVER_Read($@)
     ($cid, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
 
     if($hash->{protoNum} > 4) {
+      Log3 $sname, 3, "$cname: unsuported protocol version $hash->{protoNum}, ".
+                      "closing the connection";
       return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 1), $dump,
                                 sub{ CommandDelete(undef, $hash->{NAME}); });
     }

@@ -1,5 +1,58 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bufgix:  72_FRITZBOX: Fehler behoben bei FritzOS >= 6.69 und < 7.00
+ - feature: 76_SolarForecast: improve manual setting of pvCorrectionFactor_XX
+ - feature: 98_RandomTimer:   add recomputeTimes setter
+ - change:  38_netatmo: new token refresh handling and fallback reading
+ - bugfix:  76_SolarForecast: fix Warnings
+ - change:  76_SolarForecast: set moduleAzimuth to attr setupStringAzimuth
+                              set moduleDeclination to setupStringDeclination
+                              set moduleRoofTops to attr setupRoofTops 
+                              !NOTE! save FHEM config after restart
+ - feature: 76_SolarForecast: new consumer key exconfc
+ - change:  76_SolarForecast: set modulePeakString to attr setupStringPeak
+                              !NOTE! save FHEM config after restart
+ - change:  76_SolarForecast: set currentRadiationAPI to attr setupRadiationAPI
+                              !NOTE! save FHEM config after restart
+ - feature: 74_AutomowerConnect: new events for errors related to the APIs
+ - bugfix:  76_SolarForecast: Illegal division by zero
+ - bufgix:  32_withings: improved token refresh timing
+ - change:  38_netatmo: improved disconnect handling on auth failure
+ - change:  76_SolarForecast: set inverterStrings to attr setupInverterStrings
+                              !NOTE! save FHEM config after restart
+ - bufgix:  72_FRITZBOX: Ändern OffSet DECT Heizkörper Termostate Sommerzeit
+ - change:  76_SolarForecast: set currentInverterDev to attr setupInverterDev
+                              !NOTE! save FHEM config after restart
+ - bugfix:  73_PRESENCE2: entfernt BlockingCall loglevel = GetVerbose($name)
+ - bugfix:  73_PRESENCE:  entfernt BlockingCall loglevel = GetVerbose($name)
+ - bugfix:  98_CDCOpenData:  entfernt BlockingCall loglevel = GetVerbose($name)
+ - bufgix:  72_FRITZBOX:   entfernt BlockingCall loglevel = GetVerbose($name)
+ - change:  76_SolarForecast: set currentBatteryDev to attr setupBatteryDev
+                              !NOTE! save FHEM config after restart,
+                              minor other changes
+ - change:  76_SolarForecast: change set currentMeterDev to attr setupMeterDev
+ - feature: 76_SolarForecast: ctrlStatisticReadings: new runTimeAvgDayConsumer
+ - change:  76_SolarForecast: ctrlDebug consumerSwitching splitted into 
+                              separated consumers, minor bug fix
+ - feature: 74_AutomowerConnect: new design attribute hideSchedulerButton
+ - change:  76_SolarForecast: VictronVRM - API request start time adopted
+ - change:  73_GardenaSmartBridge: fix: api call,rate limit
+ - change:  49_SSCAM: NOTE! set enable/disable renamed to enableCam/disableCam
+                      switch commandref to ID tags
+ - change:  74_AutomowerConnect: minor changes
+ - feature: 76_SolarForecast: currentMeterDev: contotal and feedtotal can be 
+                              reset at day begin (day meter)
+ - feature: 76_SolarForecast: graphicBeamXContent: gridfeedin available, 
+                              beamGraphic: Mouse-Over shows beamcontent text
+ - feature: 74_AutomowerConnect.pm: Common.pm, automoverconnect.js
+            include rev. 28836,39,44 from contrib/, hull.js loaded if
+            needed for calculation only
+ - feature: 76_SolarForecast: graphicBeamXContent: keys energycosts, feedincome 
+ - change:  49_SSCam(STRM): optimize memory consumption
+ - change:  93_DbRep: SQLITE: change PRAGMA temp_store=MEMORY to FILE
+ - bugfix:  93_DbRep: reduceLog: fix bug if EXCL/INCL-devices end with a digit
+ - feature: 76_SolarForecast: add secondary level of the bar chart
+ - change:  76_SolarForecast: attr ctrlInterval: immediate impact when set
  - bugfix:  74_GardenaSmartDevice: fix patch code scheduling by hhhdg
  - feature: 74_AutomowerConnect.pm: new mower schedule editor
  - bugfix:  76_SolarForecast: possible Illegal division by zero if Attr

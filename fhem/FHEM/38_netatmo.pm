@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 29 / 2023-12-06
+# Release 31 / 2024-06-17
 
 package main;
 
@@ -423,7 +423,7 @@ netatmo_Define($$)
 
     delete($hash->{access_token});
     delete($hash->{access_token_app});
-    #delete($hash->{refresh_token});
+    delete($hash->{refresh_token});
     delete($hash->{refresh_token_app});
     delete($hash->{expires_at});
     delete($hash->{expires_at_app});
@@ -451,7 +451,7 @@ netatmo_Define($$)
     $hash->{helper}{client_secret} = $client_secret;
     $hash->{refresh_token} = $refresh_token;
     $hash->{helper}{refresh_token} = $hash->{refresh_token};
-    $hash->{helper}{refresh_token} = $refresh_token if(!$hash->{helper}{refresh_token});
+    $hash->{helper}{last_refresh} = 0;
 
     $hash->{helper}{INTERVAL} = 60*60 if( !$hash->{helper}{INTERVAL} );
     $attr{$name}{room} = "netatmo" if( !defined($attr{$name}{room}) && defined($name));
@@ -820,9 +820,12 @@ netatmo_refreshToken($;$)
   my ($hash,$nonblocking) = @_;
   my $name = $hash->{NAME};
 
+  return undef if($hash->{helper}{last_refresh} > (gettimeofday()-30));
+  $hash->{helper}{last_refresh} = int(gettimeofday());
+
   if( defined($hash->{access_token}) && defined($hash->{expires_at}) ) {
     my ($seconds) = gettimeofday();
-    return undef if( $seconds < $hash->{expires_at} - 300 );
+    return undef if( $seconds < $hash->{expires_at} - 600 );
   }
 
   Log3 $name, 3, "$name: refreshing token";
@@ -842,6 +845,7 @@ netatmo_refreshToken($;$)
   }
 
   if( !$hash->{helper}{refresh_token} ) {
+    Log3 $name, 1, "$name: No refresh token found";
     netatmo_getToken($hash);
     return undef;
   }
@@ -954,7 +958,11 @@ netatmo_checkConnection($;$)
   my $name = $hash->{NAME};
 
   return undef if(!$forcecheck && $hash->{network} eq "ok");
-  return undef if(!defined($hash->{access_token}));
+  if(!defined($hash->{access_token})){
+    $hash->{status} = "error";
+    $hash->{network} = "disconnected";
+    return undef;
+  }
   Log3 $name, 3, "$name: refreshing connection information";
 
   HttpUtils_NonblockingGet({
@@ -1045,7 +1053,7 @@ netatmo_connect($)
   netatmo_getToken($hash);
   #netatmo_getAppToken($hash);
 
-  InternalTimer(gettimeofday()+90, "netatmo_poll", $hash);
+  InternalTimer(gettimeofday()+60+int(rand(60)), "netatmo_poll", $hash);
 
 }
 
@@ -1081,6 +1089,7 @@ netatmo_parseDev($$$)
   my ($param,$err,$data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
+  my $iohash = $hash->{IODev};
   
   my $json = eval { JSON->new->utf8(0)->decode($data) };
   if($@)
@@ -1090,6 +1099,22 @@ netatmo_parseDev($$$)
   }
     
   my $found = 0;
+  if( ref($json) eq "HASH" && $json->{error} ){
+    Log3 $name, 2, "$name: dev hash error: ".Dumper($json->{error}{message});
+    if($json->{error} =~ /Access token expired/){
+      netatmo_refreshAppToken( $iohash, defined($iohash->{access_token_app}) );
+      InternalTimer(gettimeofday()+30, "netatmo_checkDev", $hash);
+    }
+    return undef;
+  } elsif ( ref($json) ne "HASH" ){
+    Log3 $name, 2, "$name: dev hash json error: ".Dumper($json);
+    return undef;
+  } #elsif ( ref($json->{body}) ne "ARRAY" ){
+    #Log3 $name, 2, "$name: dev body array error: ".Dumper($json);
+    #return undef;
+  #}
+
+  #foreach my $devapp ( @{$json->{body}}) {
   foreach my $devappid ( keys %{$json->{body}}) {
     my $devapp = $json->{body}{$devappid};
     if(defined($devapp->{webhook_uri}) && $devapp->{webhook_uri} eq AttrVal($name,"webhookURL","-")){
@@ -1346,7 +1371,7 @@ netatmo_initDevice($)
     return undef;
   }
 
-  InternalTimer(gettimeofday()+90, "netatmo_poll", $hash);
+  InternalTimer(gettimeofday()+60+int(rand(60)), "netatmo_poll", $hash);
 
 }
 
@@ -1918,8 +1943,8 @@ netatmo_initHome($@)
     callback => \&netatmo_dispatch,
   });
 
-  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
-  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
+  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
+  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
 }
 
 sub
@@ -2021,8 +2046,8 @@ netatmo_initHeatingHome($@)
     callback => \&netatmo_dispatch,
   });
 
-  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
-  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
+  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
+  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
 }
 
 
@@ -2063,8 +2088,8 @@ netatmo_pollHeatingHome($@)
     callback => \&netatmo_dispatch,
   });
 
-  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
-  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
+  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
+  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
 
   return undef;
 }
@@ -2118,8 +2143,8 @@ netatmo_pollHeatingRoom($@)
     callback => \&netatmo_dispatch,
   });
 
-  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
-  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
+  InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
+  $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
 
   return undef;
 }
@@ -2708,6 +2733,14 @@ netatmo_poll($)
     return undef;
   }
 
+  my $iohash = $hash->{IODev};
+  my $ioname = $iohash->{NAME};
+  if(defined($ioname) && IsDisabled($ioname)) {
+    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+7200+int(rand(1800)), "netatmo_poll", $hash);
+    return undef;
+  }
+
+
   # my $resolve = inet_aton($hash->{helper}{apiserver});
   # if(!defined($resolve))
   # {
@@ -2746,7 +2779,7 @@ netatmo_poll($)
     return undef;
   } elsif( $hash->{SUBTYPE} ne "ACCOUNT" &&  defined($hash->{IODev}->{network}) && $hash->{IODev}->{network} ne "ok" ) {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+150, "netatmo_poll", $hash);
+    InternalTimer(gettimeofday()+600+($hash->{helper}{INTERVAL}*2)+int(rand(600)), "netatmo_poll", $hash);
     $hash->{status} = "delayed update";
     #netatmo_checkConnection($hash->{IODev});
     readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data" && $hash->{SUBTYPE} ne "WEBHOOK");
@@ -2791,8 +2824,8 @@ netatmo_poll($)
   if( defined($hash->{helper}{update_count}) && $hash->{helper}{update_count} > 1024 ) {
     InternalTimer(gettimeofday()+30, "netatmo_poll", $hash);
   } else {
-    $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL};
-    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "netatmo_poll", $hash);
+    $hash->{helper}{NEXT_POLL} = int(gettimeofday())+$hash->{helper}{INTERVAL}+int(rand(60));
+    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}+int(rand(60)), "netatmo_poll", $hash);
   }
 }
 
@@ -2882,11 +2915,29 @@ netatmo_dispatch($$$)
     Log3 $name, 5, Dumper($json);
 
     if( ref($json) eq "HASH" && $json->{error} ) {
-      if(ref($json->{error}) ne "HASH") {
+      if(ref($json->{error}) ne "HASH") { #only error on login/token, error->message on other data communication
         $hash->{STATE} = "LOGIN FAILED" if($hash->{SUBTYPE} eq "ACCOUNT");
-        $hash->{status} = $json->{error};
         Log3 $name, 2, "$name: json message error: ".$json->{error};
         readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
+        if($param->{type} eq "token" && $json->{error} eq "invalid_grant"){
+          if($hash->{status} eq "invalid_grant error"){
+          $hash->{network} = "disconnected" if($hash->{SUBTYPE} eq "ACCOUNT");
+            CommandDeleteReading( undef, "$hash->{NAME} .refreshtoken" );
+          $attr{$name}{disable} = "1" if($hash->{SUBTYPE} eq "ACCOUNT");
+          Log3 $name, 2, "$name: invalid refresh ticket, disabling module";
+          }
+          else {
+            #if($hash->{expires_at} <= int(gettimeofday())){
+              $hash->{status} = "invalid_grant error";
+              Log3 $name, 2, "$name: invalid refresh ticket, retrying once";
+              $hash->{helper}{refresh_token} = ReadingsVal($name, ".refreshtoken", undef);
+              InternalTimer(gettimeofday()+5, "netatmo_refreshToken", $hash, 0);
+          #}
+        }
+        }
+        else {
+          $hash->{status} = $json->{error};
+        }
         return undef;
       }
 
@@ -3308,7 +3359,7 @@ netatmo_parseToken($$)
   my $name = $hash->{NAME};
 
   my $had_token = $hash->{access_token};
-  my $old_refresh = $hash->{refresh_token};
+  my $old_refresh = $hash->{helper}{refresh_token};
   if( $json->{access_token} ) {
 
     $hash->{access_token} = $json->{access_token};
@@ -3316,29 +3367,33 @@ netatmo_parseToken($$)
     $hash->{helper}{refresh_token} = $json->{refresh_token};
     my $new_refresh = $json->{refresh_token};
 
-    $hash->{STATE} = "Connected";
+    $hash->{STATE} = "connected";
     $hash->{network} = "ok";
 
     $hash->{expires_at} = int(gettimeofday());
     $hash->{expires_at} += int($json->{expires_in}*0.8);
 
     if($old_refresh ne $hash->{refresh_token}){
-      if($hash->{DEF} =~ /ACCOUNT/){
+      if($hash->{SUBTYPE} eq "ACCOUNT"){
+        readingsSingleUpdate( $hash, ".refreshtoken", $json->{refresh_token}, 0 );
+
         my @defarray = split(/ /, $hash->{DEF});
         pop(@defarray);
         push(@defarray, $json->{refresh_token});
         $hash->{DEF} = join(' ', @defarray);
+        $hash->{last_refresh} = FmtDateTime(gettimeofday());
       }
     }
 
     netatmo_getDevices($hash) if( !$had_token );
-
-    InternalTimer($hash->{expires_at}, "netatmo_refreshTokenTimer", $hash);
+    RemoveInternalTimer($hash, "netatmo_refreshTokenTimer");
+    InternalTimer($hash->{expires_at}-600, "netatmo_refreshTokenTimer", $hash);
   } else {
     $hash->{expires_at} = int(gettimeofday());
     $hash->{STATE} = "Error" if( !$hash->{access_token} );
     Log3 $name, 1, "$name: token error ".Dumper($json);
-    InternalTimer(gettimeofday()+600, "netatmo_refreshTokenTimer", $hash);
+    RemoveInternalTimer($hash, "netatmo_refreshTokenTimer");
+    InternalTimer(gettimeofday()+300, "netatmo_refreshTokenTimer", $hash);
   }
 }
 
@@ -3356,12 +3411,14 @@ netatmo_parseAppToken($$)
     $hash->{expires_at_app} = int(gettimeofday());
     $hash->{expires_at_app} += int($json->{expires_in}*0.8);
 
+    RemoveInternalTimer($hash, "netatmo_refreshAppTokenTimer");
      InternalTimer($hash->{expires_at_app}, "netatmo_refreshAppTokenTimer", $hash);
    } else {
      $hash->{expires_at_app} = int(gettimeofday());
      $hash->{STATE} = "Error" if( !$hash->{access_token_app} );
      Log3 $name, 1, "$name: app token error ".Dumper($json);
-     InternalTimer(gettimeofday()+600, "netatmo_refreshAppTokenTimer", $hash);
+    RemoveInternalTimer($hash, "netatmo_refreshAppTokenTimer");
+    InternalTimer(gettimeofday()+300, "netatmo_refreshAppTokenTimer", $hash);
    }
 }
 
@@ -3654,14 +3711,14 @@ netatmo_parseReadings($$;$)
         InternalTimer($hash->{helper}{NEXT_POLL}, "netatmo_poll", $hash);
         Log3 $name, 3, "$name: next fixed interval update for device ($requested) at ".FmtDateTime($hash->{helper}{NEXT_POLL});
       } elsif(defined($last_time) && int($last_time) > 0 && defined($step_time)) {
-        my $nextdata = $last_time + 2*$step_time + 10 + int(rand(20));
+        my $nextdata = $last_time + 2*$step_time + 10 + int(rand(30));
         
         if($hash->{SUBTYPE} eq "MODULE")
         {
           my $devicehash = $modules{$hash->{TYPE}}{defptr}{"D$hash->{Device}"};
           if(defined($devicehash) && defined($devicehash->{helper}{NEXT_POLL}))
           {
-            $nextdata = ($devicehash->{helper}{NEXT_POLL} + 10 + int(rand(20)) ) if($devicehash->{helper}{NEXT_POLL} >= gettimeofday()+150);
+            $nextdata = ($devicehash->{helper}{NEXT_POLL} + 10 + int(rand(30)) ) if($devicehash->{helper}{NEXT_POLL} >= gettimeofday()+150);
             if($nextdata >= (gettimeofday()+155))
             {
               RemoveInternalTimer($hash, "netatmo_poll");
@@ -3684,7 +3741,7 @@ netatmo_parseReadings($$;$)
         }
         elsif($nextdata >= (gettimeofday()+280))
         {
-          $nextdata = $nextdata + 10 + int(rand(20));
+          $nextdata = $nextdata + 10 + int(rand(60));
           RemoveInternalTimer($hash, "netatmo_poll");
           InternalTimer($nextdata, "netatmo_poll", $hash);
           $hash->{helper}{NEXT_POLL} = $nextdata;
@@ -3702,14 +3759,14 @@ netatmo_parseReadings($$;$)
           }
         }
       } elsif(defined($last_time) && int($last_time) > 0) {
-        my $nextdata = int($last_time)+(12*60);
+        my $nextdata = int($last_time)+(12*60)+int(rand(60));
         $nextdata = int(gettimeofday()+280) if($nextdata <= (gettimeofday()+280));
         RemoveInternalTimer($hash, "netatmo_poll");
         InternalTimer($nextdata, "netatmo_poll", $hash);
         $hash->{helper}{NEXT_POLL} = $nextdata;
         Log3 $name, 3, "$name: next predictive update for device ($requested) at ".FmtDateTime($nextdata);
       } else {
-        $hash->{helper}{NEXT_POLL} = int(gettimeofday())+(12*60);
+        $hash->{helper}{NEXT_POLL} = int(gettimeofday())+(12*60)+int(rand(60));
         RemoveInternalTimer($hash, "netatmo_poll");
         InternalTimer($hash->{helper}{NEXT_POLL}, "netatmo_poll", $hash);
         Log3 $name, 3, "$name: next fixed update for device ($requested) at ".FmtDateTime($hash->{helper}{NEXT_POLL});
@@ -3750,7 +3807,7 @@ netatmo_parseGlobal($$)
     $readings = $hash->{readings} if( defined($hash->{readings}) );
     if( $hash->{status} eq "ok" )
     {
-      $hash->{STATE} = "Connected";
+      $hash->{STATE} = "connected";
       foreach my $devicedata ( @{$json->{body}{devices}})
       {
 
@@ -4006,7 +4063,7 @@ netatmo_parseForecast($$)
 
     if( $hash->{status} eq "ok" )
     {
-      #$hash->{STATE} = "Connected";
+      #$hash->{STATE} = "connected";
       
       my $datatime = time;
       my $forecasttime = time;
@@ -4307,7 +4364,7 @@ netatmo_parseHomeReadings($$;$)
     $readings = $hash->{readings} if( defined($hash->{readings}) );
     if( $hash->{status} eq "ok" )
     {
-      #$hash->{STATE} = "Connected";
+      #$hash->{STATE} = "connected";
       return undef if(!defined($json->{body}{homes}));
       foreach my $homedata ( @{$json->{body}{homes}})
       {
@@ -5009,7 +5066,7 @@ netatmo_parsePersonReadings($$;$)
 
       if( $hash->{status} eq "ok" )
       {
-        #$hash->{STATE} = "Connected";
+        #$hash->{STATE} = "connected";
 
           if(defined($json->{body}{events_list}))
           {
@@ -5133,7 +5190,7 @@ netatmo_parseThermostatReadings($$;$)
         my $hash = $modules{$hash->{TYPE}}{defptr}{"R$devicedata->{_id}"};
         next if (!defined($hash));
         next if($devicedata->{_id} ne $hash->{Relay});
-        #$hash->{STATE} = "Connected";
+        #$hash->{STATE} = "connected";
 
         readingsSingleUpdate($hash, "name", encode_utf8($devicedata->{station_name}), 1) if(defined($devicedata->{station_name}));
 
@@ -6733,13 +6790,13 @@ sub netatmo_weatherIcon()
   Notes:
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
-    <li>You need to create an app <u><a href="https://dev.netatmo.com/apps/">here</a></u> to get your <i>client_id / client_secret</i>.<br />Request the full access scope including cameras and thermostats and generate a refresh token on the dev.netatmo.com page.</li>
+    <li>You need to create an app <u><a href="https://dev.netatmo.com/apps/">here</a></u> to get your <i>client_id / client_secret</i>.<br />Request the access scope including cameras and thermostats as given (read_thermostat write_thermostat read_camera write_camera access_camera read_doorbell access_doorbell read_presence write_presence access_presence read_homecoach read_carbonmonoxidedetector read_smokedetector read_station) and generate a refresh token on the dev.netatmo.com page.</li>
   </ul><br>
 
   <a name="netatmo_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; netatmo [ACCOUNT] &lt;username&gt; &lt;password&gt; &lt;client_id&gt; &lt;client_secret&gt; &lt;refresh_token&gt;</code><br>
+    <code>define &lt;name&gt; netatmo ACCOUNT &lt;username&gt; &lt;password&gt; &lt;client_id&gt; &lt;client_secret&gt; &lt;refresh_token&gt;</code><br>
     <code>define &lt;name&gt; netatmo &lt;device&gt;</code> (you should use autocreate from the account device!)<br>
     <br>
 

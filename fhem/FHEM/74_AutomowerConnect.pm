@@ -58,7 +58,6 @@ sub Initialize() {
   $hash->{SetFn}        = \&FHEM::Devices::AMConnect::Common::Set;
   $hash->{AttrFn}       = \&FHEM::Devices::AMConnect::Common::Attr;
   $hash->{AttrList}     = "disable:1,0 " .
-                          "debug:1,0 " .
                           "disabledForIntervals " .
                           "mapImagePath " .
                           "mapImageWidthHeight " .
@@ -85,7 +84,6 @@ sub Initialize() {
                           $::readingFnAttributes;
 
   $::data{FWEXT}{AutomowerConnect}{SCRIPT} = 'automowerconnect.js';
-  $::data{FWEXT}{AutomowerConnectA}{SCRIPT} = '/automowerconnect/hull.js';
 
   return undef;
 }
@@ -149,6 +147,13 @@ __END__
     <br><br>
   </ul>
   <br>
+
+  <a id='AutomowerConnect-Hints'></a>
+  <b>Hints</b>
+  <ul>
+    <li>The available setter, attributes, Readings and and the map depend on the mower capabilities ( cutting height, headlights, position, stay out zones, work areas ).</li>
+    <br>
+  </ul>
 
   <b>Button</b>
   <ul>
@@ -347,7 +352,8 @@ __END__
         mowingPathLineWidth="1"<br>
         mowingPathDotWidth="2"<br>
         mowingPathUseDots=""<br>
-        mowingPathShowCollisions=""
+        mowingPathShowCollisions=""<br>
+        hideSchedulerButton=""
       </code>
       </ul>
     </li>
@@ -540,6 +546,18 @@ __END__
   </ul>
 
 
+  <a id="AutomowerConnectEvents"></a>
+  <b>additional Events</b>
+  <ul>
+  A List of Events generated besides readings events.<br>
+  
+    <li><code>&lt;device name&gt;:AUTHENTICATION ERROR</code> Error during Authentification.</li>
+    <li><code>&lt;device name&gt;:MOWERAPI ERROR</code> Error while Connecting AutomowerConnect API.</li>
+    <li><code>&lt;device name&gt;:WEBSOCKET ERROR</code> Error related to websocket connection.</li>
+  </ul>
+  <br>
+
+
   <a id="AutomowerConnectReadings"></a>
   <b>Readings</b>
   <ul>
@@ -551,6 +569,7 @@ __END__
     <li>mower_commandSend - Last successfull sent command</li>
     <li>mower_commandStatus - Status of the last sent command cleared each status update</li>
     <li>mower_currentZone - Zone name with activity MOWING in the last status time stamp interval and number of way points in parenthesis.</li>
+    <li>mower_inactiveReason - They are NONE, PLANNING, SEARCHING_FOR_SATELLITES.</li>
     <li>mower_wsEvent - websocket connection events (status-event, positions-event, settings-event)</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
@@ -623,9 +642,15 @@ __END__
     <code>define myMower AutomowerConnect 123456789012345678901234567890123456</code> Erstes Gerät: die Defaultmähernummer ist 0.<br>
     Es muss ein <b>client_secret</b> gesetzt werden. Es ist das Application Secret vom <a target="_blank" href="https://developer.husqvarnagroup.cloud/docs/get-started">Husqvarna Developer Portal</a>.<br>
     <code>set myMower client_secret &lt;client secret&gt;</code><br>
-    <br>
   </ul>
   <br>
+
+  <a id='AutomowerConnect-Hints'></a>
+  <b>Hinweise</b>
+  <ul>
+    <li> Die verfügbaren Setter, Attribute und Readings, so wie die Karte, werden durch die im Mähertyp vorhandenen Fähigkeiten ( cutting height, headlights, position, stay out zones, work areas ) bestimmt.</li>
+    <br>
+  </ul>
 
   <b>Button</b>
   <ul>
@@ -825,7 +850,8 @@ __END__
         mowingPathLineWidth="1"<br>
         mowingPathDotWidth="2"<br>
         mowingPathUseDots=""<br>
-        mowingPathShowCollisions=""
+        mowingPathShowCollisions=""<br>
+        hideSchedulerButton=""
       </code>
       </ul>
     </li>
@@ -984,12 +1010,11 @@ __END__
       </code>
     </li>
 
-     <li><a href="disable">disable</a></li>
+    <li><a href="disable">disable</a></li>
 
-     <li><a href="disabledForIntervals">disabledForIntervals</a></li>
-  <br>
+    <li><a href="disabledForIntervals">disabledForIntervals</a></li>
+    <br>
   </ul>
-  <br>
 
 
   <a id="AutomowerConnectUserAttr"></a>
@@ -1018,8 +1043,19 @@ __END__
       <code>attr &lt;name&gt; testing 1</code><br>
      Macht Befehle verfügbar, die mit Testing markiert sind.</li><br>
 
-    <br><br>
   </ul>
+
+
+  <a id="AutomowerConnectEvents"></a>
+  <b>zusätzliche Events</b>
+  <ul>
+  Eine Liste von Events zusätzlich zu den Readingsevents.<br>
+  
+    <li><code>&lt;device name&gt;:AUTHENTICATION ERROR</code> Fehler bei der Authentifizierung.</li>
+    <li><code>&lt;device name&gt;:MOWERAPI ERROR</code> Fehler bei der Verbindung zur AutomowerConnect API.</li>
+    <li><code>&lt;device name&gt;:WEBSOCKET ERROR</code> Fehler bei der Websocketverbindung.</li>
+  </ul>
+  <br>
 
 
   <a id="AutomowerConnectReadings"></a>
@@ -1033,6 +1069,7 @@ __END__
     <li>mower_commandSend - Letzter erfolgreich gesendeter Befehl.</li>
     <li>mower_commandStatus - Status des letzten uebermittelten Kommandos wird duch Statusupdate zurückgesetzt.</li>
     <li>mower_currentZone - Name der Zone im aktuell abgefragten Intervall der Statuszeitstempel , in der der Mäher gemäht hat und Anzahl der Wegpunkte in der Zone in Klammern.</li>
+    <li>mower_inactiveReason - Gründe für Inaktivität: NONE, PLANNING, SEARCHING_FOR_SATELLITES.</li>
     <li>mower_wsEvent - Events der Websocketverbindung (status-event, positions-event, settings-event)</li>
     <li>mower_errorCode - last error code</li>
     <li>mower_errorCodeTimestamp - last error code time stamp</li>
