@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 02_HTTPAPI.pm 26361 2022-08-30 09:21:46Z klaus.schauer $
 # HTTP API commands
 #   set command: http://<ip-addr>:<ip-port>/<apiName>/set?device=<devname>&action=<cmd>
 #   get command: http://<ip-addr>:<ip-port>/<apiName>/get?device=<devname>&action=<cmd>
@@ -154,17 +154,17 @@ sub HTTPAPI_CGI {
             $valName = substr(($1 // $2 // $3 // $4), 1);
             # url decoding
             $valName =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-            my $val = $apiCmd eq 'readtimestamp' ? ReadingsTimestamp($fhemDevName, $valName, undef) :
+            my $val = $apiCmd eq 'readtimestamp' ? ReadingsTimestamp($fhemDevName, $valName, undef) : 
                       $apiCmd eq 'readinternal'  ? InternalVal($fhemDevName, $valName, undef)       :
                       ReadingsVal($fhemDevName, $valName, undef);
             #readingsSingleUpdate($defs{$name}, 'reponse', "$valName=$val", 1);
             if (defined $val) {
               return($hash, 200, 'close', "text/plain; charset=utf-8", encode($encoding, "$valName=$val"));
             } else {
-              return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > reading or internal $valName unknown"))
+              return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > reading $valName unknown"))
             }
           } else {
-            return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute reading or internal is missing"))
+            return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute reading/internal is missing"))
           }
         } elsif ($apiCmd eq 'set') {
           my $setCmd;
@@ -258,7 +258,7 @@ sub HTTPAPI_Read {
   }
 
   $infix = $hash->{infix};
-
+  
   # read data
   my $buf;
   my $ret = sysread($hash->{CD}, $buf, 2048);
@@ -310,7 +310,7 @@ sub HTTPAPI_Read {
       delete $hash->{CONTENT_LENGTH};
       next;
     } elsif ($url !~ m/\/$infix\//i) {
-      $ret = HTTPAPI_TcpServerWrite($hash, 400, 'close', "text/plain; charset=utf-8", "error=400 Bad Request, wrong infix");
+      $ret = HTTPAPI_TcpServerWrite($hash, 400, 'close', "text/plain; charset=utf-8", "error=400 Bad Request - wrong infix");
       delete $hash->{CONTENT_LENGTH};
       next;
     } else {
@@ -477,16 +477,6 @@ sub HTTPAPI_Undef {
       Response:
       <ul>
         <code>&lt;reading name&gt;=|error=&lt;error message&gt;</code><br>
-      </ul>
-    </li>
-    <li>API command line for querying a internal<br>
-      Request:
-      <ul>
-        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/readinternal?device=&lt;devname&gt;&internal=&lt;name&gt;</code><br>
-      </ul>
-      Response:
-      <ul>
-        <code>&lt;internal name&gt;=&lt;val&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
   </ul>

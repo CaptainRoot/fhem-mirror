@@ -5968,17 +5968,24 @@ par:BASE_ID;Base topic as set in OpenDTU MQTT settings;{ AttrVal('DEVICE','readi
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 #par:BR_REG_NAME;Bridge RegEx Name for target inverter device;{ my $r1 = AttrVal('DEVICE','readingList','') =~ m,([^:]+)/([^:]+)/name:, ? $1 : "xxx";; my $r2 = AttrVal('DEVICE','readingList','') =~ m,([^:]+)/([^:]+)/name:, ? $2 : "yyy";; my $rn = $r1 . "_" . $r2 ."_name";; return ReadingsVal('DEVICE',"$rn",undef) }
 attr DEVICE icon ICON
-attr DEVICE bridgeRegexp BASE_ID/([0-9]+)/.*/.*:.* "BASE_ID_$1"
+attr DEVICE bridgeRegexp BASE_ID/([[:xdigit:]]+)/.*:.*  "BASE_ID_$1"
 #attr DEVICE bridgeRegexp BASE_ID/[0-9]+/.*/.*:.* "BR_REG_NAME"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/dtu/uptime:.* uptime\
   BASE_ID/dtu/status:.* status\
   BASE_ID/dtu/ip:.* ip\
   BASE_ID/dtu/rssi:.' rssi\
-  BASE_ID/dtu/hostname:.* hostname
+  BASE_ID/dtu/hostname:.* hostname\
+  BASE_ID/ac/power:.* power\
+  BASE_ID/ac/yieldtotal:.* yieldtotal\
+  BASE_ID/ac/yieldday:.* yieldday\
+  BASE_ID/ac/is_valid:.* is_valid\
+  BASE_ID/dc/power:.* powerdc\
+  BASE_ID/dc/irradiation:.* irradiation\
+  BASE_ID/dc/is_valid:.* is_validdc
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_opendtu_hub_bridge
-setreading DEVICE attrTemplateVersion 20221215
+setreading DEVICE attrTemplateVersion 20240513
 { AttrTemplate_Initialize() }
 
 name:hoymiles_opendtu_microinverter
@@ -5995,6 +6002,17 @@ attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
 option:{ RADIO_SINGLE }
 attr DEVICE readingList \
+  INVERTERLONG_ID/name:.* name\
+  INVERTERLONG_ID/status/reachable:.* reachable\
+  INVERTERLONG_ID/status/producing:.* producing\
+  INVERTERLONG_ID/status/last_update:.* last_update\
+  INVERTERLONG_ID/device/bootloaderversion:.* bootloaderversion\
+  INVERTERLONG_ID/device/fwbuildversion:.* fwbuildversion\
+  INVERTERLONG_ID/device/fwbuilddatetime:.* fwbuilddatetime\
+  INVERTERLONG_ID/device/hwpartnumber:.* hwpartnumber\
+  INVERTERLONG_ID/device/hwversion:.* hwversion\
+  INVERTERLONG_ID/status/limit_relative:.* limit_relative\
+  INVERTERLONG_ID/status/limit_absolute:.* limit_absolute\
   INVERTERLONG_ID/0/powerdc:.* powerdc\
   INVERTERLONG_ID/0/yieldday:.* {}\
   INVERTERLONG_ID/0/yieldtotal:.* {}\
@@ -6012,15 +6030,23 @@ attr DEVICE readingList \
   INVERTERLONG_ID/1/irradiation:.* irradiation1\
   INVERTERLONG_ID/1/yieldday:.* yieldday\
   INVERTERLONG_ID/1/yieldtotal:.* yieldtotal\
+  INVERTERLONG_ID/1/name:.* name1
+option:{ RADIO_DOUBLE }
+attr DEVICE readingList \
   INVERTERLONG_ID/name:.* name\
   INVERTERLONG_ID/status/reachable:.* reachable\
   INVERTERLONG_ID/status/producing:.* producing\
-  INVERTERLONG_ID/status/last_update:.* last_update
-option:{ RADIO_DOUBLE }
-attr DEVICE readingList \
+  INVERTERLONG_ID/status/last_update:.* last_update\
+  INVERTERLONG_ID/device/bootloaderversion:.* bootloaderversion\
+  INVERTERLONG_ID/device/fwbuildversion:.* fwbuildversion\
+  INVERTERLONG_ID/device/fwbuilddatetime:.* fwbuilddatetime\
+  INVERTERLONG_ID/device/hwpartnumber:.* hwpartnumber\
+  INVERTERLONG_ID/device/hwversion:.* hwversion\
+  INVERTERLONG_ID/status/limit_relative:.* limit_relative\
+  INVERTERLONG_ID/status/limit_absolute:.* limit_absolute\
   INVERTERLONG_ID/0/powerdc:.* powerdc\
-  INVERTERLONG_ID/0/yieldday:.* yieldday\
-  INVERTERLONG_ID/0/yieldtotal:.* yieldtotal\
+  INVERTERLONG_ID/0/yieldday:.* {}\
+  INVERTERLONG_ID/0/yieldtotal:.* {}\
   INVERTERLONG_ID/0/voltage:.* voltage\
   INVERTERLONG_ID/0/current:.* current\
   INVERTERLONG_ID/0/power:.* power\
@@ -6035,21 +6061,30 @@ attr DEVICE readingList \
   INVERTERLONG_ID/1/irradiation:.* irradiation1\
   INVERTERLONG_ID/1/yieldday:.* yieldday1\
   INVERTERLONG_ID/1/yieldtotal:.* yieldtotal1\
+  INVERTERLONG_ID/1/name:.* name1\
   INVERTERLONG_ID/2/voltage:.* voltage2\
   INVERTERLONG_ID/2/current:.* current2\
   INVERTERLONG_ID/2/power:.* power2\
   INVERTERLONG_ID/2/irradiation:.* irradiation2\
   INVERTERLONG_ID/2/yieldday:.* yieldday2\
   INVERTERLONG_ID/2/yieldtotal:.* yieldtotal2\
+  INVERTERLONG_ID/2/name:.* name2
+option:{ RADIO_QUATTRO }
+attr DEVICE readingList \
   INVERTERLONG_ID/name:.* name\
   INVERTERLONG_ID/status/reachable:.* reachable\
   INVERTERLONG_ID/status/producing:.* producing\
-  INVERTERLONG_ID/status/last_update:.* last_update
-option:{ RADIO_QUATTRO }
-attr DEVICE readingList \
+  INVERTERLONG_ID/status/last_update:.* last_update\
+  INVERTERLONG_ID/device/bootloaderversion:.* bootloaderversion\
+  INVERTERLONG_ID/device/fwbuildversion:.* fwbuildversion\
+  INVERTERLONG_ID/device/fwbuilddatetime:.* fwbuilddatetime\
+  INVERTERLONG_ID/device/hwpartnumber:.* hwpartnumber\
+  INVERTERLONG_ID/device/hwversion:.* hwversion\
+  INVERTERLONG_ID/status/limit_relative:.* limit_relative\
+  INVERTERLONG_ID/status/limit_absolute:.* limit_absolute\
   INVERTERLONG_ID/0/powerdc:.* powerdc\
-  INVERTERLONG_ID/0/yieldday:.* yieldday\
-  INVERTERLONG_ID/0/yieldtotal:.* yieldtotal\
+  INVERTERLONG_ID/0/yieldday:.* {}\
+  INVERTERLONG_ID/0/yieldtotal:.* {}\
   INVERTERLONG_ID/0/voltage:.* voltage\
   INVERTERLONG_ID/0/current:.* current\
   INVERTERLONG_ID/0/power:.* power\
@@ -6063,23 +6098,29 @@ attr DEVICE readingList \
   INVERTERLONG_ID/1/power:.* power1\
   INVERTERLONG_ID/1/irradiation:.* irradiation1\
   INVERTERLONG_ID/1/yieldday:.* yieldday1\
+  INVERTERLONG_ID/1/yieldtotal:.* yieldtotal1\
+  INVERTERLONG_ID/1/name:.* name1\
+  INVERTERLONG_ID/2/voltage:.* voltage2\
+  INVERTERLONG_ID/2/current:.* current2\
+  INVERTERLONG_ID/2/power:.* power2\
+  INVERTERLONG_ID/2/irradiation:.* irradiation2\
+  INVERTERLONG_ID/2/yieldday:.* yieldday2\
   INVERTERLONG_ID/2/yieldtotal:.* yieldtotal2\
+  INVERTERLONG_ID/2/name:.* name2\
   INVERTERLONG_ID/3/voltage:.* voltage3\
   INVERTERLONG_ID/3/current:.* current3\
   INVERTERLONG_ID/3/power:.* power3\
   INVERTERLONG_ID/3/irradiation:.* irradiation3\
   INVERTERLONG_ID/3/yieldday:.* yieldday3\
   INVERTERLONG_ID/3/yieldtotal:.* yieldtotal3\
+  INVERTERLONG_ID/3/name:.* name3\
   INVERTERLONG_ID/4/voltage:.* voltage4\
   INVERTERLONG_ID/4/current:.* current4\
   INVERTERLONG_ID/4/power:.* power4\
   INVERTERLONG_ID/4/irradiation:.* irradiation4\
   INVERTERLONG_ID/4/yieldday:.* yieldday4\
   INVERTERLONG_ID/4/yieldtotal:.* yieldtotal4\
-  INVERTERLONG_ID/name:.* name\
-  INVERTERLONG_ID/status/reachable:.* reachable\
-  INVERTERLONG_ID/status/producing:.* producing\
-  INVERTERLONG_ID/status/last_update:.* last_update
+  INVERTERLONG_ID/4/name:.* name4
 option:global
 attr DEVICE setList \
   on:noArg INVERTERLONG_ID/cmd/power 1\
@@ -6091,7 +6132,7 @@ attr DEVICE setList \
   limit_persistent_pct:slider,2,1,100 INVERTERLONG_ID/cmd/limit_nonpersistent_relative $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_opendtu_microinverter
-setreading DEVICE attrTemplateVersion 20221215
+setreading DEVICE attrTemplateVersion 20240513
 
 
 ###########################################
@@ -6118,3 +6159,51 @@ ring $\DEVICETOPIC/exec $EVTPART0_$EVTPART1\
 playAudio $\DEVICETOPIC/playAudio $EVTPART1
 attr DEVICE model SiedleGateway
 setreading DEVICE attrTemplateVersion 20210515
+
+####################################
+# provided by Tueftler1983, see https://forum.fhem.de/index.php?msg=1313868
+#Use this for the WLAN Module RelaxAndSpa for Bestway Lay Z Spar Wirlpools. The Wlan module ist Selled and #Supportet from Michael Krenner https://www.mk-innovations.de/smartandrelax-modul/
+name:LayZSpa
+filter:TYPE=MQTT2_DEVICE
+order:W_743354
+par:BASE_TOPIC;base topic set in SmarAndRelax MQTT Konfiguration;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/Status:, ? $1 : undef }
+desc:Use this for the WiFi Module RelaxAndSpa for Bestway Lay Z Spar Wirlpools. The WiFi module ist selled and supportet by Michael Krenner https://www.mk-innovations.de/smartandrelax-modul/. Note: in case Client-ID and Basic-Topic include SPACE letters, you will have to change that fist in the settings of the WiFi module!
+attr DEVICE readingList BASE_TOPIC/button:.* button\
+  BASE_TOPIC/message:.* { $EVENT =~ s/"(FLT|AIR|RED|GRN)":1/"$1":"on"/g; $EVENT =~ s/"(FLT|AIR|RED|GRN)":0/"$1":"off"/g; $EVENT =~ s/"(UNT)":1/"$1":"Celsius"/g; $EVENT =~ s/"(UNT)":0/"$1":"Fahrenheit"/g; json2nameValue($EVENT,'',$JSONMAP) }\
+  BASE_TOPIC/times:.* { json2nameValue($EVENT, 'times_', $JSONMAP) }\
+  BASE_TOPIC/other:.* { json2nameValue($EVENT, 'other_', $JSONMAP) }\
+  BASE_TOPIC/Status:.* { $EVENT eq 'Alive' ? {LWT=>'online'} : {LWT=>'offline'} }\
+  BASE_TOPIC/MAC_Address:.* MAC_Address\
+  BASE_TOPIC/MQTT_Connect_Count:.* MQTT_Connect_Count\
+  BASE_TOPIC/reboot_time:.* reboot_time\
+  BASE_TOPIC/reboot_reason:.* reboot_reason
+attr DEVICE devStateIcon 2.on:water-heat@orange:heater+off\
+2.off:water-heat@red:heater+on\
+3.off:water-heat@red:heater+on\
+3.on:water-heat@green:heater+off\
+1.on:sani_domestic_waterworks@green:pump+off\
+1.off:sani_domestic_waterworks@red:pump+on\
+4.off:vent_ventilation_level_0@red:air+on\
+4.on:vent_ventilation_level_3@green:air+off
+attr DEVICE jsonMap TGT:desired-temp TMP:temperature FLT:pump AIR:air RED:heater GRN:hot UNT:unit AMB:ambiant-temp
+attr DEVICE setList pump:on,off { my $on = $EVTPART1 eq 'on'?1:0; qq(BASE_TOPIC/command { "CMD":4, "VALUE":$on, "XTIME":0, "INTERVAL":0 }) }\
+  desired-temp:slider,20,1,40 BASE_TOPIC/command {CMD:0,VALUE:$EVTPART1,XTIME:0,INTERVAL:0}\
+  air:on,off { my $on = $EVTPART1 eq 'on'?1:0; qq(BASE_TOPIC/command { "CMD":2, "VALUE":$on, "XTIME":0, "INTERVAL":0 }) }\
+  unit:Celsius,Fahrenheit { my $Celsius = $EVTPART1 eq 'Celsius'?1:0; qq(BASE_TOPIC/command  { "CMD":1, "VALUE":$Celsius, "XTIME":0, "INTERVAL":0 }) }\
+  heater:on,off { my $on = $EVTPART1 eq 'on'?1:0; qq(BASE_TOPIC/command { "CMD":3, "VALUE":$on, "XTIME":0, "INTERVAL":0 }) }\
+  reset_chlorid BASE_TOPIC/command {"CMD":9,"VALUE":,"XTIME":0,"INTERVAL":0}\
+  reset_filter BASE_TOPIC/command {"CMD":10,"VALUE":,"XTIME":0,"INTERVAL":0}
+attr DEVICE stateFormat 1:pump\
+2:heater\
+3:hot\
+4:air\
+temperature Grad C\
+<br>\
+Letzter Filter Wechsel last_filter_change Tage\
+<br>\
+Letzte Chlorung last_add_chlorid Tage
+attr DEVICE userReadings last_add_chlorid:times_CLTIME.* {return int((time()-ReadingsVal($name, 'times_CLTIME', 0))/DAYSECONDS);}, last_filter_change:times_FTIME.* {return int((time()-ReadingsVal($name, 'times_FTIME', 0))/DAYSECONDS);}
+attr DEVICE webCmd desired-temp:reset_filter:reset_chlorid
+attr DEVICE setStateList on off
+attr DEVICE model LayZSpa
+setreading DEVICE attrTemplateVersion 20240524
