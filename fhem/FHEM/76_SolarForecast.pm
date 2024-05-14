@@ -6468,6 +6468,7 @@ sub _addDynAttr {
                    SolCast-API
                    ForecastSolar-API
                    VictronKI-API
+                   LocalKI-API
                  );
   push @fcdevs, @alldwd if(@alldwd);
   my $rdd = join ",", @fcdevs;
@@ -14702,6 +14703,14 @@ sub aiAddRawData {
 
           my $rad1h = HistoryVal ($hash, $pvd, $hod, 'rad1h', undef);
           next if(!$rad1h || $rad1h <= 0);
+
+          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+          #######################################################################################################################
+          next if($rad1h =~ /\.[0-9]{1}$/xs);                 # 29.03.2024 -> einen Monat drin lassen wegen pvHistory turn
+          if ($rad1h =~ /\.00$/xs) {                          # 29.03.2024 -> einen Monat drin lassen wegen pvHistory turn
+              $rad1h = int $rad1h;
+          }
+          #######################################################################################################################
 
           my $pvrl  = HistoryVal ($hash, $pvd, $hod, 'pvrl', undef);
           next if(!$pvrl || $pvrl <= 0);
